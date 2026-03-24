@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
+data/lotto_history.csv
+data/prediction_log.json
+.env
