@@ -22,7 +22,7 @@ def mm2px(v): return int(v * DPI / 25.4)
 # workspace/lotto.jpg 실측 (1200DPI 가로형)
 SECTION_X = [41.0, 68.5, 96.0, 123.5, 151.0]  # A~E 1번열 X (+0.3mm)
 NUM1_Y = 11.7      # 1행 Y (+0.6mm)
-COL_MM = 3.45      # 열 간격 (-0.01)
+COL_MM = 3.43      # 열 간격 (-0.02)
 ROW_MM = 6.46      # 행 간격 (-0.01)
 
 # 마킹 크기
