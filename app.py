@@ -453,12 +453,10 @@ elif page == "📜 예측 이력":
             st.divider()
             st.markdown("### 🖨️ 로또 용지 인쇄")
 
-            from display.lotto_paper import (
-                create_preview_image, create_marking_image,
-                image_to_bytes, SECTION_X_START,
-                COL_STEP_MM, ROW_STEP_MM, MARK_SIZE_MM
-            )
             import display.lotto_paper as lp
+            from display.lotto_paper import (
+                create_preview_image, create_marking_image, image_to_bytes,
+            )
 
             game_sets = [s['numbers'] for s in print_entry['sets'][:5]]
             target = print_entry['target_round']
@@ -476,7 +474,7 @@ elif page == "📜 예측 이력":
                     mark = st.number_input("마킹(mm)", value=lp.MARK_SIZE_MM, step=0.1, format="%.1f", key="pm")
                     sec_x1 = st.number_input("A구역X(mm)", value=lp.SECTION_X_START[0], step=0.5, format="%.1f", key="ps")
                 with a4:
-                    sec_y = st.number_input("1행Y(mm)", value=lp.SECTION_FIRST_ROW_Y[0], step=0.5, format="%.1f", key="psy")
+                    sec_y = st.number_input("1행Y(mm)", value=lp.SECTION_Y_START, step=0.5, format="%.1f", key="psy")
 
                 lp.OFFSET_X_MM = off_x
                 lp.OFFSET_Y_MM = off_y
