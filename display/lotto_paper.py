@@ -99,6 +99,10 @@ def create_preview_on_scan(game_sets: list[list[int]]) -> Image.Image:
     overlay = Image.new("RGBA", bg.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
 
+    # 회전 후 세로 직사각형이 되도록, 스캔에서는 가로로 그림 (W↔H 스왑)
+    scan_mw = _SCAN_MH  # 회전 후 세로가 될 방향 = 스캔에서 가로
+    scan_mh = _SCAN_MW  # 회전 후 가로가 될 방향 = 스캔에서 세로
+
     for sec_idx, numbers in enumerate(game_sets[:5]):
         for num in numbers:
             if not (1 <= num <= 45):
@@ -107,18 +111,18 @@ def create_preview_on_scan(game_sets: list[list[int]]) -> Image.Image:
             col = (num - 1) % 7
             x = _SCAN_A1_X + col * _SCAN_COL
             y = _SCAN_SECTION_Y[sec_idx] + row * _SCAN_ROW
-            draw.rectangle([x-_SCAN_MW, y-_SCAN_MH, x+_SCAN_MW, y+_SCAN_MH],
+            draw.rectangle([x-scan_mw, y-scan_mh, x+scan_mw, y+scan_mh],
                           fill=(0, 0, 0, 220))
 
         # 수동 선택 체크
         chk_y = _SCAN_SECTION_Y[sec_idx] + _SCAN_CHK_DY
-        draw.rectangle([_SCAN_CHK_X-_SCAN_MW, chk_y-_SCAN_MH,
-                        _SCAN_CHK_X+_SCAN_MW, chk_y+_SCAN_MH],
+        draw.rectangle([_SCAN_CHK_X-scan_mw, chk_y-scan_mh,
+                        _SCAN_CHK_X+scan_mw, chk_y+scan_mh],
                        fill=(0, 0, 0, 220))
 
     result = Image.alpha_composite(bg, overlay)
     # 가로형으로 회전 (화면 표시용)
-    rotated = result.convert("RGB").transpose(Image.ROTATE_270)
+    rotated = result.convert("RGB").transpose(Image.ROTATE_90)
     return rotated
 
 
