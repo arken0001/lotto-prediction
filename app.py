@@ -269,35 +269,20 @@ if page == "🎱 예측하기":
                 st.caption("ℹ️ 동일한 번호가 이미 저장되어 있습니다")
 
             # 프린트 버튼
-            pr1, pr2 = st.columns(2)
-            with pr1:
-                try:
-                    from display.lotto_paper import generate_lotto_paper
-                    pred_nums = [nums for nums, _ in predictions]
-                    img_bytes = generate_lotto_paper(pred_nums)
-                    st.download_button(
-                        "🖨️ 로또용지 마킹 다운로드",
-                        data=img_bytes,
-                        file_name=f"lotto_{last_round+1}.png",
-                        mime="image/png",
-                        use_container_width=True,
-                    )
-                except Exception:
-                    pass
-            with pr2:
-                try:
-                    from display.lotto_paper import generate_escpos_data
-                    pred_nums = [nums for nums, _ in predictions]
-                    esc_data = generate_escpos_data(pred_nums, last_round + 1)
-                    st.download_button(
-                        "🧾 영수증 출력 데이터",
-                        data=esc_data,
-                        file_name=f"lotto_{last_round+1}.bin",
-                        mime="application/octet-stream",
-                        use_container_width=True,
-                    )
-                except Exception:
-                    pass
+            try:
+                from display.lotto_paper import create_marking_image, image_to_bytes
+                pred_nums = [nums for nums, _ in predictions]
+                print_img = create_marking_image(pred_nums)
+                print_bytes = image_to_bytes(print_img)
+                st.download_button(
+                    "🖨️ 로또용지 마킹 다운로드",
+                    data=print_bytes,
+                    file_name=f"lotto_{last_round+1}.png",
+                    mime="image/png",
+                    use_container_width=True,
+                )
+            except Exception:
+                pass
 
     with right_col:
         # HOT / COLD / OVERDUE 컴팩트
