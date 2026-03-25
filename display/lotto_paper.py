@@ -21,9 +21,9 @@ def mm2px(v): return int(v * DPI / 25.4)
 # ── 좌표 (mm, 가로형 용지 좌상단 기준) ──
 # workspace/lotto.jpg 실측 (1200DPI 가로형)
 SECTION_X = [41.0, 68.5, 96.0, 123.5, 151.0]  # A~E 1번열 X (+0.3mm)
-NUM1_Y = 11.1      # 1행 Y (-0.3mm)
-COL_MM = 3.46      # 열 간격 (3.47 - 0.01)
-ROW_MM = 6.47      # 행 간격 (유지)
+NUM1_Y = 11.7      # 1행 Y (+0.6mm)
+COL_MM = 3.45      # 열 간격 (-0.01)
+ROW_MM = 6.46      # 행 간격 (-0.01)
 
 # 마킹 크기
 MARK_W_MM = 1.90   # 가로
