@@ -20,9 +20,9 @@ def mm2px(v): return int(v * DPI / 25.4)
 
 # ── 좌표 (mm, 가로형 용지 좌상단 기준) ──
 # workspace/lotto.jpg 실측 (1200DPI 가로형)
-SECTION_X = [41.0, 68.5, 96.0, 123.5, 151.0]  # A~E 1번열 X (+0.3mm)
+SECTION_X = [41.6, 69.1, 96.6, 124.1, 151.6]  # A~E 1번열 X (+0.6mm)
 NUM1_Y = 11.7      # 1행 Y (+0.6mm)
-COL_MM = 3.43      # 열 간격 (-0.02)
+COL_MM = 3.42      # 열 간격 (-0.01)
 ROW_MM = 6.46      # 행 간격 (-0.01)
 
 # 마킹 크기
@@ -30,7 +30,7 @@ MARK_W_MM = 1.90   # 가로
 MARK_H_MM = 3.04   # 세로
 
 # 수동선택 체크박스
-CHK_X_MM = 61.5    # A란 자동선택 X (+0.3mm)
+CHK_X_MM = 62.1    # A란 자동선택 X (+0.6mm)
 CHK_Y_MM = 68.9    # 자동선택 Y (고정)
 CHK_SEC_GAP = 27.5 # 구역간 간격 (SECTION_X와 동일)
 
