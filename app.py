@@ -194,7 +194,7 @@ with st.sidebar:
 
     page = st.radio(
         "메뉴",
-        ["🎱 예측하기", "📜 예측 이력", "🖨️ 인쇄", "📊 분석 리포트", "🔬 백테스트", "❓ 원리 & 사용법"],
+        ["🎱 예측하기", "📜 예측 이력", "📊 분석 리포트", "🔬 백테스트", "❓ 원리 & 사용법"],
         index=0,
     )
 
@@ -420,179 +420,118 @@ elif page == "📜 예측 이력":
             html += '</div>'
             return html, entry_id
 
+        def render_card_column(items, col_offset):
+            for i, entry in enumerate(items):
+                real_idx = i * 2 + col_offset
+                card_html, eid = render_card(entry, real_idx)
+                st.markdown(card_html, unsafe_allow_html=True)
+                bc1, bc2, bc3 = st.columns([1, 1, 1])
+                with bc1:
+                    if st.button("🖨️ 인쇄", key=f"print_{eid}", use_container_width=True):
+                        st.session_state['print_entry'] = entry
+                with bc2:
+                    if st.button("🗑️ 전체삭제", key=f"del_{eid}", use_container_width=True):
+                        delete_prediction(eid)
+                        st.rerun()
+                with bc3:
+                    opts = [f"{j+1}세트" for j in range(len(entry['sets']))]
+                    if opts:
+                        sel = st.selectbox("세트", opts, key=f"sel_{eid}", label_visibility="collapsed")
+                        if st.button("세트삭제", key=f"ds_{eid}", use_container_width=True):
+                            delete_set_from_prediction(eid, opts.index(sel))
+                            st.rerun()
+
         col_l, col_r = st.columns(2)
-
         with col_l:
-            for i, entry in enumerate(left_items):
-                real_idx = i * 2
-                card_html, eid = render_card(entry, real_idx)
-                st.markdown(card_html, unsafe_allow_html=True)
-                with st.expander("삭제", expanded=False):
-                    dc1, dc2 = st.columns(2)
-                    with dc1:
-                        if st.button("전체 삭제", key=f"del_{eid}", use_container_width=True):
-                            delete_prediction(eid)
-                            st.rerun()
-                    with dc2:
-                        opts = [f"{j+1}세트" for j in range(len(entry['sets']))]
-                        if opts:
-                            sel = st.selectbox("세트", opts, key=f"sel_{eid}", label_visibility="collapsed")
-                            if st.button("세트 삭제", key=f"ds_{eid}", use_container_width=True):
-                                delete_set_from_prediction(eid, opts.index(sel))
-                                st.rerun()
-
+            render_card_column(left_items, 0)
         with col_r:
-            for i, entry in enumerate(right_items):
-                real_idx = i * 2 + 1
-                card_html, eid = render_card(entry, real_idx)
-                st.markdown(card_html, unsafe_allow_html=True)
-                with st.expander("삭제", expanded=False):
-                    dc1, dc2 = st.columns(2)
-                    with dc1:
-                        if st.button("전체 삭제", key=f"del_{eid}", use_container_width=True):
-                            delete_prediction(eid)
-                            st.rerun()
-                    with dc2:
-                        opts = [f"{j+1}세트" for j in range(len(entry['sets']))]
-                        if opts:
-                            sel = st.selectbox("세트", opts, key=f"sel_{eid}", label_visibility="collapsed")
-                            if st.button("세트 삭제", key=f"ds_{eid}", use_container_width=True):
-                                delete_set_from_prediction(eid, opts.index(sel))
-                                st.rerun()
+            render_card_column(right_items, 1)
 
+        # ── 인쇄 미리보기 영역 ──
+        print_entry = st.session_state.get('print_entry')
+        if print_entry:
+            st.divider()
+            st.markdown("### 🖨️ 로또 용지 인쇄")
 
-# ═══════════════════════════════════════════════════════
-# 🖨️ 인쇄
-# ═══════════════════════════════════════════════════════
-elif page == "🖨️ 인쇄":
-    st.markdown('<p class="main-title">🖨️ 로또 용지 인쇄</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-title">레이저 프린터로 로또 용지에 직접 마킹 인쇄</p>',
-                unsafe_allow_html=True)
-
-    from display.lotto_paper import (
-        generate_lotto_paper, create_preview_image, create_marking_image,
-        image_to_bytes, OFFSET_X_MM, OFFSET_Y_MM,
-        SECTION_TOP_MM, GRID_RIGHT_MM, GRID_TOP_MM,
-        COL_STEP_MM, ROW_STEP_MM, MARK_SIZE_MM
-    )
-    import display.lotto_paper as lp
-
-    # 번호 소스 선택
-    st.markdown("### 번호 입력")
-    source = st.radio("번호 소스", ["최근 예측 사용", "직접 입력"], horizontal=True, label_visibility="collapsed")
-
-    if source == "최근 예측 사용":
-        predictions = st.session_state.get('predictions', [])
-        if predictions:
-            game_sets = [nums for nums, _ in predictions[:5]]
-            for i, nums in enumerate(game_sets, 1):
-                st.markdown(f"**{chr(64+i)}:** {', '.join(str(n) for n in nums)}")
-        else:
-            st.warning("예측하기에서 먼저 번호를 생성해 주세요.")
-            game_sets = []
-    else:
-        game_sets = []
-        cols = st.columns(5)
-        for i in range(5):
-            with cols[i]:
-                txt = st.text_input(f"{chr(65+i)}게임", placeholder="예: 4,6,16,27,37,38", key=f"print_g{i}")
-                if txt.strip():
-                    try:
-                        nums = [int(n.strip()) for n in txt.split(',') if n.strip()]
-                        if len(nums) == 6 and all(1 <= n <= 45 for n in nums):
-                            game_sets.append(sorted(nums))
-                        else:
-                            st.error("6개, 1~45")
-                    except ValueError:
-                        st.error("숫자만 입력")
-
-    if game_sets:
-        st.divider()
-
-        # 좌표 미세 조정
-        st.markdown("### ⚙️ 좌표 조정 (테스트 인쇄 후 미세 조정)")
-        adj1, adj2, adj3 = st.columns(3)
-        with adj1:
-            off_x = st.number_input("X 보정 (mm)", value=0.0, step=0.2, format="%.1f",
-                                     help="+ → 오른쪽, - → 왼쪽")
-            off_y = st.number_input("Y 보정 (mm)", value=0.0, step=0.2, format="%.1f",
-                                     help="+ → 아래, - → 위")
-        with adj2:
-            col_step = st.number_input("열 간격 (mm)", value=COL_STEP_MM, step=0.1, format="%.1f")
-            row_step = st.number_input("행 간격 (mm)", value=ROW_STEP_MM, step=0.1, format="%.1f")
-        with adj3:
-            mark_size = st.number_input("마킹 크기 (mm)", value=MARK_SIZE_MM, step=0.1, format="%.1f")
-            grid_right = st.number_input("1번 X위치 (mm)", value=GRID_RIGHT_MM, step=0.5, format="%.1f")
-
-        # 보정값 적용
-        lp.OFFSET_X_MM = off_x
-        lp.OFFSET_Y_MM = off_y
-        lp.COL_STEP_MM = col_step
-        lp.ROW_STEP_MM = row_step
-        lp.MARK_SIZE_MM = mark_size
-        lp.GRID_RIGHT_MM = grid_right
-
-        st.divider()
-
-        # 미리보기 + 인쇄
-        preview_col, action_col = st.columns([2, 1])
-
-        with preview_col:
-            st.markdown("### 미리보기")
-            preview_img = create_preview_image(game_sets)
-            st.image(preview_img, use_container_width=True)
-
-        with action_col:
-            st.markdown("### 인쇄")
-
-            # 인쇄용 이미지 (마킹만)
-            print_img = create_marking_image(game_sets)
-            print_bytes = image_to_bytes(print_img)
-
-            st.download_button(
-                "📄 인쇄용 이미지 다운로드",
-                data=print_bytes,
-                file_name="lotto_print.png",
-                mime="image/png",
-                use_container_width=True,
+            from display.lotto_paper import (
+                create_preview_image, create_marking_image,
+                image_to_bytes, SECTION_X_START,
+                COL_STEP_MM, ROW_STEP_MM, MARK_SIZE_MM
             )
+            import display.lotto_paper as lp
 
-            # 브라우저 직접 인쇄
-            import base64
-            b64 = base64.b64encode(print_bytes).decode()
-            print_html = f"""
-            <button onclick="printLotto()" style="
-                width:100%; padding:12px; margin:8px 0;
-                background:#e44; color:white; border:none;
-                border-radius:8px; font-size:1rem; font-weight:700;
-                cursor:pointer;">
-                🖨️ 바로 인쇄
-            </button>
-            <script>
-            function printLotto() {{
-                var win = window.open('', '_blank');
-                win.document.write('<html><head><title>로또 인쇄</title>');
-                win.document.write('<style>@page {{ size: 62mm 155mm; margin: 0; }} body {{ margin:0; }}</style>');
-                win.document.write('</head><body>');
-                win.document.write('<img src="data:image/png;base64,{b64}" style="width:62mm; height:155mm;">');
-                win.document.write('</body></html>');
-                win.document.close();
-                win.print();
-            }}
-            </script>
-            """
-            st.markdown(print_html, unsafe_allow_html=True)
+            game_sets = [s['numbers'] for s in print_entry['sets'][:5]]
+            target = print_entry['target_round']
 
-            st.markdown("""
-            <div style="color:#888; font-size:0.75rem; margin-top:12px; line-height:1.5;">
-                <b>인쇄 방법:</b><br>
-                1. 프린터에 로또 용지를 수동급지<br>
-                2. '바로 인쇄' 클릭<br>
-                3. 용지 크기: 62x155mm 설정<br>
-                4. 여백: 0 (없음)<br>
-                5. 위치가 안 맞으면 좌표 조정 후 재인쇄
-            </div>
-            """, unsafe_allow_html=True)
+            # 좌표 조정
+            with st.expander("⚙️ 좌표 미세 조정 (테스트 인쇄 후)", expanded=False):
+                a1, a2, a3, a4 = st.columns(4)
+                with a1:
+                    off_x = st.number_input("X보정(mm)", value=0.0, step=0.3, format="%.1f", key="px")
+                    off_y = st.number_input("Y보정(mm)", value=0.0, step=0.3, format="%.1f", key="py")
+                with a2:
+                    col_s = st.number_input("열간격(mm)", value=lp.COL_STEP_MM, step=0.1, format="%.1f", key="pc")
+                    row_s = st.number_input("행간격(mm)", value=lp.ROW_STEP_MM, step=0.1, format="%.1f", key="pr")
+                with a3:
+                    mark = st.number_input("마킹(mm)", value=lp.MARK_SIZE_MM, step=0.1, format="%.1f", key="pm")
+                    sec_x1 = st.number_input("A구역X(mm)", value=lp.SECTION_X_START[0], step=0.5, format="%.1f", key="ps")
+                with a4:
+                    sec_y = st.number_input("1행Y(mm)", value=lp.SECTION_FIRST_ROW_Y[0], step=0.5, format="%.1f", key="psy")
+
+                lp.OFFSET_X_MM = off_x
+                lp.OFFSET_Y_MM = off_y
+                lp.COL_STEP_MM = col_s
+                lp.ROW_STEP_MM = row_s
+                lp.MARK_SIZE_MM = mark
+
+            # 미리보기 + 다운로드
+            prev_col, act_col = st.columns([3, 1])
+            with prev_col:
+                preview_img = create_preview_image(game_sets)
+                st.image(preview_img, use_container_width=True,
+                         caption=f"제{target}회 예측 ({len(game_sets)}게임)")
+
+            with act_col:
+                print_img = create_marking_image(game_sets)
+                print_bytes = image_to_bytes(print_img)
+
+                st.download_button(
+                    "📄 이미지 다운로드",
+                    data=print_bytes,
+                    file_name=f"lotto_{target}.png",
+                    mime="image/png",
+                    use_container_width=True,
+                )
+
+                import base64
+                b64 = base64.b64encode(print_bytes).decode()
+                st.markdown(f"""
+                <button onclick="(function(){{
+                    var w=window.open('','_blank');
+                    w.document.write('<html><head><title>로또 인쇄</title>');
+                    w.document.write('<style>@page{{size:190mm 82.5mm;margin:0}}body{{margin:0}}</style>');
+                    w.document.write('</head><body>');
+                    w.document.write('<img src=\\"data:image/png;base64,{b64}\\" style=\\"width:190mm;height:82.5mm;\\">');
+                    w.document.write('</body></html>');
+                    w.document.close();w.print();
+                }})()" style="
+                    width:100%;padding:10px;margin:8px 0;
+                    background:#e44;color:white;border:none;
+                    border-radius:8px;font-size:0.9rem;font-weight:700;cursor:pointer;">
+                    🖨️ 바로 인쇄
+                </button>
+                """, unsafe_allow_html=True)
+
+                st.markdown("""<div style="color:#666; font-size:0.65rem; line-height:1.5; margin-top:8px;">
+                    1. 수동급지에 로또 용지<br>
+                    2. 용지: 190x82.5mm<br>
+                    3. 여백: 0<br>
+                    4. 위치 안 맞으면 조정
+                </div>""", unsafe_allow_html=True)
+
+                if st.button("✕ 닫기", key="close_print", use_container_width=True):
+                    del st.session_state['print_entry']
+                    st.rerun()
 
 
 # ═══════════════════════════════════════════════════════
