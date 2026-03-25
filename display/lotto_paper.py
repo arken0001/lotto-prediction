@@ -1,70 +1,60 @@
 """로또 용지 마킹 이미지 생성 모듈
 
-실측 규격: 82.5mm x 190mm (세로형, 프린터 급지 방향)
-스캔 이미지 기반 좌표 보정 완료
-
-마킹: 세로로 긴 사각형 (OMR 인식용)
-"수동 선택" 체크박스 자동 마킹 포함
+용지: 190mm x 82.5mm (가로형, 1200DPI 실측)
+A~E 5구역 좌→우 배치
+마킹: 세로 직사각형 (0.95mm x 1.52mm)
 """
 
 from PIL import Image, ImageDraw, ImageFont
 import io
 from pathlib import Path
 
-# ── 용지 규격 (mm, 세로형) ──
-PAPER_W_MM = 82.5    # 폭
-PAPER_H_MM = 190.0   # 높이
+# ── 용지 규격 (mm, 가로형) ──
+PAPER_W_MM = 190.0
+PAPER_H_MM = 82.5
 
 # ── DPI ──
-DPI = 600
+DPI = 1200  # 원본 이미지와 동일
 
 def mm2px(v): return int(v * DPI / 25.4)
 
-# ── 스캔 실측 좌표 (mm, 용지 좌상단 기준) ──
-# 스캔 이미지 분석으로 도출
-A1_X_MM = 18.59      # 1번 칸 중심 X
-A1_Y_MM = 22.01      # A구역 1번 행 중심 Y
-COL_STEP_MM = 4.18   # 열 간격 (1→2→...→7, 좌→우)
-ROW_STEP_MM = 2.64   # 행 간격 (1행→2행, 위→아래)
+# ── 좌표 (mm, 가로형 용지 좌상단 기준) ──
+# workspace/lotto.jpg 실측 (1200DPI 가로형)
+SECTION_X = [27.37, 56.36, 85.35, 114.34, 143.33]  # A~E 1번열 X
+NUM1_Y = 17.30     # 1행 Y
+COL_MM = 3.42      # 열 간격 (1→2→...→7)
+ROW_MM = 3.42      # 행 간격
 
-# 각 구역 1행 Y좌표 (mm)
-SECTION_Y = [22.01, 53.07, 84.13, 115.19, 146.25]  # A~E
+# 마킹 크기
+MARK_W_MM = 0.95   # 가로 (좁음)
+MARK_H_MM = 1.52   # 세로 (긺)
 
-# 마킹 크기 (mm)
-MARK_W_MM = 1.02     # 가로 (좁음)
-MARK_H_MM = 1.72     # 세로 (긺)
-
-# "수동 선택" 체크박스
-CHECKBOX_X_MM = 7.28  # 체크박스 X
-CHECKBOX_DY_MM = 19.50  # 1행에서 체크박스까지 Y 거리
+# 수동선택 체크박스
+CHK_DX_MM = -3.61  # 1번열 X에서 좌측 오프셋
+CHK_Y_MM = 68.43   # 체크박스 Y
 
 # 보정값
 OFFSET_X_MM = 0.0
 OFFSET_Y_MM = 0.0
 
-# ── 스캔 미리보기용 좌표 (축소 이미지 px) ──
-_SCAN_A1_X = 395
-_SCAN_A1_Y = 358
-_SCAN_COL = 82
-_SCAN_ROW = 40
-_SCAN_SECTION_Y = [358, 828, 1298, 1768, 2238]
-_SCAN_MW = 10   # 마킹 반폭
-_SCAN_MH = 13   # 마킹 반높이
-_SCAN_CHK_X = 173
-_SCAN_CHK_DY = 295
+# ── 미리보기용 축소 좌표 (2000x868 이미지 기준) ──
+_BG_W = 2000
+_BG_H = 868
+_BG_SCALE = _BG_W / (PAPER_W_MM * DPI / 25.4)  # 2000 / 8976 = 0.2228
+_BG_PX_PER_MM = _BG_W / PAPER_W_MM  # 10.526
 
 
 def number_to_pos(num: int, section_idx: int) -> tuple[float, float]:
     """번호(1~45)의 인쇄 좌표 (mm)"""
     row = (num - 1) // 7
     col = (num - 1) % 7
-    x = A1_X_MM + col * COL_STEP_MM + OFFSET_X_MM
-    y = SECTION_Y[section_idx] + row * ROW_STEP_MM + OFFSET_Y_MM
+    x = SECTION_X[section_idx] + col * COL_MM + OFFSET_X_MM
+    y = NUM1_Y + row * ROW_MM + OFFSET_Y_MM
     return (x, y)
 
 
 def create_marking_image(game_sets: list[list[int]]) -> Image.Image:
-    """인쇄용 이미지 (82.5mm x 190mm, 흰배경 + 검은 사각형 마킹)"""
+    """인쇄용 이미지 (190x82.5mm 가로형, 흰배경 + 검은 마킹)"""
     w = mm2px(PAPER_W_MM)
     h = mm2px(PAPER_H_MM)
     img = Image.new('RGB', (w, h), 'white')
@@ -73,24 +63,24 @@ def create_marking_image(game_sets: list[list[int]]) -> Image.Image:
     mw = mm2px(MARK_W_MM) // 2
     mh = mm2px(MARK_H_MM) // 2
 
-    for sec_idx, numbers in enumerate(game_sets[:5]):
+    for si, numbers in enumerate(game_sets[:5]):
         for num in numbers:
             if not (1 <= num <= 45):
                 continue
-            x_mm, y_mm = number_to_pos(num, sec_idx)
+            x_mm, y_mm = number_to_pos(num, si)
             cx, cy = mm2px(x_mm), mm2px(y_mm)
             draw.rectangle([cx-mw, cy-mh, cx+mw, cy+mh], fill='black')
 
-        # 수동 선택 체크
-        chk_x = mm2px(CHECKBOX_X_MM + OFFSET_X_MM)
-        chk_y = mm2px(SECTION_Y[sec_idx] + CHECKBOX_DY_MM + OFFSET_Y_MM)
+        # 수동선택 체크
+        chk_x = mm2px(SECTION_X[si] + CHK_DX_MM + OFFSET_X_MM)
+        chk_y = mm2px(CHK_Y_MM + OFFSET_Y_MM)
         draw.rectangle([chk_x-mw, chk_y-mh, chk_x+mw, chk_y+mh], fill='black')
 
     return img
 
 
 def create_preview_on_scan(game_sets: list[list[int]]) -> Image.Image:
-    """스캔 이미지 위에 마킹 오버레이 (미리보기)"""
+    """배경 이미지 위에 마킹 오버레이 (가로형 미리보기)"""
     bg_path = Path(__file__).parent.parent / "data" / "lotto_paper_bg.png"
     if not bg_path.exists():
         return create_preview_simple(game_sets)
@@ -99,92 +89,67 @@ def create_preview_on_scan(game_sets: list[list[int]]) -> Image.Image:
     overlay = Image.new("RGBA", bg.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
 
-    # 회전 후 세로 직사각형이 되도록, 스캔에서는 가로로 그림 (W↔H 스왑)
-    scan_mw = _SCAN_MH  # 회전 후 세로가 될 방향 = 스캔에서 가로
-    scan_mh = _SCAN_MW  # 회전 후 가로가 될 방향 = 스캔에서 세로
+    ppm = _BG_PX_PER_MM  # px per mm
+    mw = int(MARK_W_MM * ppm / 2)
+    mh = int(MARK_H_MM * ppm / 2)
 
-    for sec_idx, numbers in enumerate(game_sets[:5]):
+    for si, numbers in enumerate(game_sets[:5]):
         for num in numbers:
             if not (1 <= num <= 45):
                 continue
-            row = (num - 1) // 7
-            col = (num - 1) % 7
-            x = _SCAN_A1_X + col * _SCAN_COL
-            y = _SCAN_SECTION_Y[sec_idx] + row * _SCAN_ROW
-            draw.rectangle([x-scan_mw, y-scan_mh, x+scan_mw, y+scan_mh],
-                          fill=(0, 0, 0, 220))
+            x_mm, y_mm = number_to_pos(num, si)
+            cx = int(x_mm * ppm)
+            cy = int(y_mm * ppm)
+            draw.rectangle([cx-mw, cy-mh, cx+mw, cy+mh], fill=(0, 0, 0, 220))
 
-        # 수동 선택 체크
-        chk_y = _SCAN_SECTION_Y[sec_idx] + _SCAN_CHK_DY
-        draw.rectangle([_SCAN_CHK_X-scan_mw, chk_y-scan_mh,
-                        _SCAN_CHK_X+scan_mw, chk_y+scan_mh],
-                       fill=(0, 0, 0, 220))
+        # 수동선택 체크
+        chk_x = int((SECTION_X[si] + CHK_DX_MM + OFFSET_X_MM) * ppm)
+        chk_y = int((CHK_Y_MM + OFFSET_Y_MM) * ppm)
+        draw.rectangle([chk_x-mw, chk_y-mh, chk_x+mw, chk_y+mh], fill=(0, 0, 0, 220))
 
     result = Image.alpha_composite(bg, overlay)
-    # 가로형으로 회전 (화면 표시용)
-    rotated = result.convert("RGB").transpose(Image.ROTATE_90)
-    return rotated
+    return result.convert("RGB")
 
 
 def create_preview_simple(game_sets: list[list[int]]) -> Image.Image:
-    """스캔 없을 때 간단 미리보기"""
-    pdpi = 150
-    def pmm(v): return int(v * pdpi / 25.4)
-
-    w, h = pmm(PAPER_W_MM), pmm(PAPER_H_MM)
-    img = Image.new('RGB', (w, h), '#fefefe')
+    """배경 없을 때 간단 미리보기"""
+    pw, ph = 1200, 520
+    img = Image.new('RGB', (pw, ph), '#fefefe')
     draw = ImageDraw.Draw(img)
+    draw.rectangle([1, 1, pw-2, ph-2], outline='#ccc', width=2)
 
     try:
-        font = ImageFont.truetype("arial.ttf", pmm(2.0))
-        lfont = ImageFont.truetype("arialbd.ttf", pmm(4.0))
+        font = ImageFont.truetype("arial.ttf", 13)
     except Exception:
         font = ImageFont.load_default()
-        lfont = font
 
-    draw.rectangle([1, 1, w-2, h-2], outline='#ccc', width=2)
-
+    ppm = pw / PAPER_W_MM
     sel = set()
     for si, nums in enumerate(game_sets[:5]):
         for n in nums:
             sel.add((si, n))
 
-    cw = pmm(COL_STEP_MM)
-    ch = pmm(ROW_STEP_MM)
+    cw = int(COL_MM * ppm)
+    ch = int(ROW_MM * ppm)
 
     for si in range(5):
-        label = chr(65+si)
-        sy = pmm(SECTION_Y[si])
-        sx = pmm(A1_X_MM)
-
-        gl = sx - pmm(1)
-        gr = sx + pmm(COL_STEP_MM*6 + 1)
-        gt = sy - pmm(1)
-        gb = sy + pmm(ROW_STEP_MM*6 + 1)
-        draw.rectangle([gl, gt, gr, gb], outline='#e88', width=1)
-
-        bbox = draw.textbbox((0,0), label, font=lfont)
-        tw = bbox[2]-bbox[0]
-        draw.text((gr-tw-pmm(1), gt-pmm(5)), label, fill='#e44', font=lfont)
-
         for num in range(1, 46):
             r = (num-1)//7
             c = (num-1)%7
-            cx = pmm(A1_X_MM + c*COL_STEP_MM)
-            cy = pmm(SECTION_Y[si] + r*ROW_STEP_MM)
+            cx = int((SECTION_X[si] + c*COL_MM) * ppm)
+            cy = int((NUM1_Y + r*ROW_MM) * ppm)
 
             if (si, num) in sel:
                 draw.rectangle([cx-cw//2+1, cy-ch//2+1, cx+cw//2-1, cy+ch//2-1], fill='#222')
                 tc = 'white'
             else:
-                draw.rectangle([cx-cw//2+1, cy-ch//2+1, cx+cw//2-1, cy+ch//2-1], outline='#bbb', width=1)
+                draw.rectangle([cx-cw//2+1, cy-ch//2+1, cx+cw//2-1, cy+ch//2-1], outline='#bbb')
                 tc = '#888'
-            text = str(num)
-            bbox = draw.textbbox((0,0), text, font=font)
-            draw.text((cx-(bbox[2]-bbox[0])//2, cy-(bbox[3]-bbox[1])//2), text, fill=tc, font=font)
+            t = str(num)
+            bb = draw.textbbox((0,0), t, font=font)
+            draw.text((cx-(bb[2]-bb[0])//2, cy-(bb[3]-bb[1])//2), t, fill=tc, font=font)
 
-    rotated = img.transpose(Image.ROTATE_270)
-    return rotated
+    return img
 
 
 def image_to_bytes(img: Image.Image, fmt: str = 'PNG') -> bytes:
@@ -203,9 +168,7 @@ def generate_escpos_data(predictions: list[list[int]], round_no: int = None) -> 
         data += f'  #{round_no}\n'.encode('euc-kr', errors='replace')
     data += b'------------------------\n' + ESC + b'a\x00'
     for i, nums in enumerate(predictions[:5], 1):
-        label = chr(64 + i)
-        nums_str = ' '.join(f'{n:02d}' for n in sorted(nums))
-        data += f' {label}: {nums_str}\n'.encode('euc-kr', errors='replace')
+        data += f' {chr(64+i)}: {" ".join(f"{n:02d}" for n in sorted(nums))}\n'.encode('euc-kr', errors='replace')
     data += b'------------------------\n' + ESC + b'a\x01'
     from datetime import datetime
     data += datetime.now().strftime('%Y-%m-%d %H:%M\n').encode()

@@ -502,9 +502,9 @@ elif page == "📜 예측 이력":
                 document.getElementById('printBtn').onclick=function(){{
                     var w=window.open('','_blank','width=800,height=400');
                     w.document.write('<html><head><title>로또 인쇄</title>');
-                    w.document.write('<style>@page{{size:82.5mm 190mm;margin:0}}body{{margin:0;padding:0}}</style>');
+                    w.document.write('<style>@page{{size:190mm 82.5mm;margin:0}}body{{margin:0;padding:0}}</style>');
                     w.document.write('</head><body>');
-                    w.document.write('<img src="data:image/png;base64,{b64}" style="width:82.5mm;height:190mm;">');
+                    w.document.write('<img src="data:image/png;base64,{b64}" style="width:190mm;height:82.5mm;">');
                     w.document.write('</body></html>');
                     w.document.close();
                     setTimeout(function(){{w.print();}},300);
@@ -513,7 +513,7 @@ elif page == "📜 예측 이력":
                 """, height=45)
             with c3:
                 st.markdown("""<div style="color:#777; font-size:0.7rem; line-height:1.6; padding-top:6px;">
-                    수동급지에 로또 용지 → 용지: 82.5×190mm (세로) → 여백: 0 → 위치 안 맞으면 조정값 수정
+                    수동급지에 로또 용지 → 용지: 190×82.5mm (가로) → 여백: 0 → 위치 안 맞으면 조정값 수정
                 </div>""", unsafe_allow_html=True)
 
             # 좌표 조정
