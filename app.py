@@ -513,7 +513,12 @@ elif page == "📜 예측 이력":
                 """, height=45)
             with c3:
                 st.markdown("""<div style="color:#777; font-size:0.7rem; line-height:1.6; padding-top:6px;">
-                    수동급지에 로또 용지 → 용지: 190×82.5mm (가로) → 여백: 0 → 위치 안 맞으면 조정값 수정
+                    <b>인쇄 설정:</b><br>
+                    1. 프린터에 사용자 정의 용지 등록: <b>190×82.5mm</b><br>
+                    &nbsp;&nbsp;&nbsp;(Windows 설정 → 프린터 → 인쇄 기본설정 → 사용자 정의 용지)<br>
+                    2. 수동급지에 로또 용지 넣기 (E구역이 위쪽)<br>
+                    3. 여백: 없음 / 배율: 100%<br>
+                    4. 위치 안 맞으면 아래 좌표 조정
                 </div>""", unsafe_allow_html=True)
 
             # 좌표 조정
