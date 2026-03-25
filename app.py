@@ -451,67 +451,87 @@ elif page == "📜 예측 이력":
         print_entry = st.session_state.get('print_entry')
         if print_entry:
             st.divider()
-            st.markdown("### 🖨️ 로또 용지 인쇄")
 
             import display.lotto_paper as lp
             from display.lotto_paper import (
-                create_preview_image, create_marking_image, image_to_bytes,
+                create_preview_on_scan, create_preview_simple,
+                create_marking_image, image_to_bytes,
             )
 
             game_sets = [s['numbers'] for s in print_entry['sets'][:5]]
             target = print_entry['target_round']
 
-            # 좌표 조정
-            with st.expander("⚙️ 좌표 미세 조정 (테스트 인쇄 후)", expanded=False):
-                a1, a2, a3, a4 = st.columns(4)
-                with a1:
-                    off_x = st.number_input("X보정(mm)", value=0.0, step=0.3, format="%.1f", key="px")
-                    off_y = st.number_input("Y보정(mm)", value=0.0, step=0.3, format="%.1f", key="py")
-                with a2:
-                    col_s = st.number_input("열간격(mm)", value=lp.COL_STEP_MM, step=0.1, format="%.1f", key="pc")
-                    row_s = st.number_input("행간격(mm)", value=lp.ROW_STEP_MM, step=0.1, format="%.1f", key="pr")
-                with a3:
-                    mark = st.number_input("마킹(mm)", value=lp.MARK_SIZE_MM, step=0.1, format="%.1f", key="pm")
-                    sec_x1 = st.number_input("A구역X(mm)", value=lp.SECTION_X_START[0], step=0.5, format="%.1f", key="ps")
-                with a4:
-                    sec_y = st.number_input("1행Y(mm)", value=lp.SECTION_Y_START, step=0.5, format="%.1f", key="psy")
+            hdr1, hdr2 = st.columns([4, 1])
+            with hdr1:
+                st.markdown(f"### 🖨️ 제{target}회 인쇄 미리보기 ({len(game_sets)}게임)")
+            with hdr2:
+                if st.button("✕ 닫기", key="close_print", use_container_width=True):
+                    del st.session_state['print_entry']
+                    st.rerun()
 
-                lp.OFFSET_X_MM = off_x
-                lp.OFFSET_Y_MM = off_y
-                lp.COL_STEP_MM = col_s
-                lp.ROW_STEP_MM = row_s
-                lp.MARK_SIZE_MM = mark
+            # 스캔 배경 미리보기
+            preview_img = create_preview_on_scan(game_sets)
+            st.image(preview_img, use_container_width=True)
 
-            # 미리보기 + 다운로드
-            prev_col, act_col = st.columns([3, 1])
-            with prev_col:
-                preview_img = create_preview_image(game_sets)
-                st.image(preview_img, use_container_width=True,
-                         caption=f"제{target}회 예측 ({len(game_sets)}게임)")
-
-            with act_col:
+            # 인쇄 버튼
+            c1, c2, c3 = st.columns([1, 1, 2])
+            with c1:
                 print_img = create_marking_image(game_sets)
                 print_bytes = image_to_bytes(print_img)
-
                 st.download_button(
-                    "🖨️ 인쇄용 다운로드",
+                    "📄 인쇄용 이미지",
                     data=print_bytes,
                     file_name=f"lotto_{target}.png",
                     mime="image/png",
                     use_container_width=True,
                     type="primary",
                 )
-
-                st.markdown("""<div style="color:#666; font-size:0.65rem; line-height:1.5; margin-top:8px;">
-                    1. 수동급지에 로또 용지<br>
-                    2. 용지: 190x82.5mm<br>
-                    3. 여백: 0<br>
-                    4. 위치 안 맞으면 조정
+            with c2:
+                # 인쇄 안내 HTML
+                import streamlit.components.v1 as components
+                import base64
+                b64 = base64.b64encode(print_bytes).decode()
+                components.html(f"""
+                <button id="printBtn" style="
+                    width:100%;padding:10px 16px;
+                    background:#e44;color:white;border:none;
+                    border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">
+                    🖨️ 바로 인쇄
+                </button>
+                <script>
+                document.getElementById('printBtn').onclick=function(){{
+                    var w=window.open('','_blank','width=800,height=400');
+                    w.document.write('<html><head><title>로또 인쇄</title>');
+                    w.document.write('<style>@page{{size:190mm 82.5mm;margin:0}}body{{margin:0;padding:0}}</style>');
+                    w.document.write('</head><body>');
+                    w.document.write('<img src="data:image/png;base64,{b64}" style="width:190mm;height:82.5mm;">');
+                    w.document.write('</body></html>');
+                    w.document.close();
+                    setTimeout(function(){{w.print();}},300);
+                }};
+                </script>
+                """, height=45)
+            with c3:
+                st.markdown("""<div style="color:#777; font-size:0.7rem; line-height:1.6; padding-top:6px;">
+                    수동급지에 로또 용지 → 용지: 190×82.5mm → 여백: 0 → 위치 안 맞으면 조정값 수정
                 </div>""", unsafe_allow_html=True)
 
-                if st.button("✕ 닫기", key="close_print", use_container_width=True):
-                    del st.session_state['print_entry']
-                    st.rerun()
+            # 좌표 조정
+            with st.expander("⚙️ 좌표 미세 조정", expanded=False):
+                a1, a2 = st.columns(2)
+                with a1:
+                    off_x = st.number_input("X보정(mm)", value=0.0, step=0.3, format="%.1f", key="px")
+                    off_y = st.number_input("Y보정(mm)", value=0.0, step=0.3, format="%.1f", key="py")
+                with a2:
+                    st.markdown("""<div style="color:#888; font-size:0.7rem; line-height:1.6;">
+                        <b>보정 방법:</b><br>
+                        1. 빈 A4에 테스트 인쇄<br>
+                        2. 로또 용지에 겹쳐서 확인<br>
+                        3. 어긋난 만큼 X/Y 보정값 입력<br>
+                        X: + 오른쪽 / Y: + 아래
+                    </div>""", unsafe_allow_html=True)
+                lp.OFFSET_X_MM = off_x
+                lp.OFFSET_Y_MM = off_y
 
 
 # ═══════════════════════════════════════════════════════
