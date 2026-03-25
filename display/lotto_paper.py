@@ -22,15 +22,15 @@ def mm2px(v): return int(v * DPI / 25.4)
 # workspace/lotto.jpg 실측 (1200DPI 가로형)
 SECTION_X = [26.37, 55.36, 84.35, 113.34, 142.33]  # A~E 1번열 X (좌 1mm 보정)
 NUM1_Y = 18.30     # 1행 Y (하 1mm 보정)
-COL_MM = 3.42      # 열 간격 (1→2→...→7)
-ROW_MM = 3.42      # 행 간격
+COL_MM = 3.30      # 열 간격 (1→2→...→7)
+ROW_MM = 3.65      # 행 간격
 
 # 마킹 크기 (2배)
 MARK_W_MM = 1.90   # 가로
 MARK_H_MM = 3.04   # 세로
 
 # 수동선택 체크박스
-CHK_DX_MM = -3.61  # 1번열 X에서 좌측 오프셋
+CHK_DX_MM = -2.0   # 1번열 X에서 좌측 오프셋
 CHK_Y_MM = 69.43   # 체크박스 Y (하 1mm 보정)
 
 # 보정값
