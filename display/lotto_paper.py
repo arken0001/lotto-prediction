@@ -20,18 +20,19 @@ def mm2px(v): return int(v * DPI / 25.4)
 
 # ── 좌표 (mm, 가로형 용지 좌상단 기준) ──
 # workspace/lotto.jpg 실측 (1200DPI 가로형)
-SECTION_X = [38.97, 67.96, 96.95, 125.94, 154.93]  # A~E 1번열 X (+12.6mm)
-NUM1_Y = 20.10     # 1행 Y (+1.8mm)
-COL_MM = 4.40      # 열 간격 (3.30+1.1mm)
-ROW_MM = 5.95      # 행 간격 (3.65+2.3mm)
+SECTION_X = [41.0, 68.5, 96.0, 123.5, 151.0]  # A~E 1번열 X (간격 27.5mm)
+NUM1_Y = 12.0      # 1행 Y
+COL_MM = 3.5       # 열 간격 (가로)
+ROW_MM = 6.5       # 행 간격 (세로)
 
 # 마킹 크기
 MARK_W_MM = 1.90   # 가로
 MARK_H_MM = 3.04   # 세로
 
 # 수동선택 체크박스
-CHK_DX_MM = 24.0   # 1번열 X에서 우측 오프셋 (기존-2 + 26mm)
-CHK_Y_MM = 67.50   # 체크박스 Y (하단에서 15mm = 82.5-15)
+CHK_X_MM = 61.5    # A란 자동선택 X 절대좌표
+CHK_Y_MM = 69.5    # 자동선택 Y
+CHK_SEC_GAP = 27.5 # 구역간 간격 (SECTION_X와 동일)
 
 # 보정값
 OFFSET_X_MM = 0.0
@@ -72,7 +73,7 @@ def create_marking_image(game_sets: list[list[int]]) -> Image.Image:
             draw.rectangle([cx-mw, cy-mh, cx+mw, cy+mh], fill='black')
 
         # 수동선택 체크
-        chk_x = mm2px(SECTION_X[si] + CHK_DX_MM + OFFSET_X_MM)
+        chk_x = mm2px(CHK_X_MM + si * CHK_SEC_GAP + OFFSET_X_MM)
         chk_y = mm2px(CHK_Y_MM + OFFSET_Y_MM)
         draw.rectangle([chk_x-mw, chk_y-mh, chk_x+mw, chk_y+mh], fill='black')
 
@@ -103,7 +104,7 @@ def create_preview_on_scan(game_sets: list[list[int]]) -> Image.Image:
             draw.rectangle([cx-mw, cy-mh, cx+mw, cy+mh], fill=(0, 0, 0, 220))
 
         # 수동선택 체크
-        chk_x = int((SECTION_X[si] + CHK_DX_MM + OFFSET_X_MM) * ppm)
+        chk_x = int((CHK_X_MM + si * CHK_SEC_GAP + OFFSET_X_MM) * ppm)
         chk_y = int((CHK_Y_MM + OFFSET_Y_MM) * ppm)
         draw.rectangle([chk_x-mw, chk_y-mh, chk_x+mw, chk_y+mh], fill=(0, 0, 0, 220))
 
