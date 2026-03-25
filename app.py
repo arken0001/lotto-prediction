@@ -494,31 +494,13 @@ elif page == "📜 예측 이력":
                 print_bytes = image_to_bytes(print_img)
 
                 st.download_button(
-                    "📄 이미지 다운로드",
+                    "🖨️ 인쇄용 다운로드",
                     data=print_bytes,
                     file_name=f"lotto_{target}.png",
                     mime="image/png",
                     use_container_width=True,
+                    type="primary",
                 )
-
-                import base64
-                b64 = base64.b64encode(print_bytes).decode()
-                st.markdown(f"""
-                <button onclick="(function(){{
-                    var w=window.open('','_blank');
-                    w.document.write('<html><head><title>로또 인쇄</title>');
-                    w.document.write('<style>@page{{size:190mm 82.5mm;margin:0}}body{{margin:0}}</style>');
-                    w.document.write('</head><body>');
-                    w.document.write('<img src=\\"data:image/png;base64,{b64}\\" style=\\"width:190mm;height:82.5mm;\\">');
-                    w.document.write('</body></html>');
-                    w.document.close();w.print();
-                }})()" style="
-                    width:100%;padding:10px;margin:8px 0;
-                    background:#e44;color:white;border:none;
-                    border-radius:8px;font-size:0.9rem;font-weight:700;cursor:pointer;">
-                    🖨️ 바로 인쇄
-                </button>
-                """, unsafe_allow_html=True)
 
                 st.markdown("""<div style="color:#666; font-size:0.65rem; line-height:1.5; margin-top:8px;">
                     1. 수동급지에 로또 용지<br>

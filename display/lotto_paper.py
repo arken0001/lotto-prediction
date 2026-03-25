@@ -23,7 +23,7 @@ def mm(v): return int(v * DPI / 25.4)
 # ── 5개 구역 (A~E) 좌→우 배치 ──
 # 각 구역의 번호 그리드 1번(좌상단) 중심 좌표 (용지 좌상단 기준, mm)
 # 첫번째 사진 참고: A가 가장 왼쪽, E가 오른쪽
-SECTION_X_START = [43.0, 75.0, 107.0, 139.0, 171.0]  # 각 구역 1열(1번) 중심 X
+SECTION_X_START = [33.0, 65.0, 97.0, 129.0, 161.0]  # 각 구역 1열(1번) 중심 X
 SECTION_Y_START = 18.0   # 1행 중심 Y (모든 구역 동일)
 
 # ── 번호 그리드 간격 ──
@@ -70,75 +70,101 @@ def create_marking_image(game_sets: list[list[int]]) -> Image.Image:
 
 
 def create_preview_image(game_sets: list[list[int]]) -> Image.Image:
-    """미리보기용 이미지 (다크 배경, 컬러 마킹)"""
-    preview_dpi = 200
+    """미리보기용 이미지 (실제 로또 용지 스타일)"""
+    preview_dpi = 250
     def pmm(v): return int(v * preview_dpi / 25.4)
 
     w, h = pmm(PAPER_W_MM), pmm(PAPER_H_MM)
-    img = Image.new('RGB', (w, h), '#1a1a2e')
+    img = Image.new('RGB', (w, h), '#fefefe')
     draw = ImageDraw.Draw(img)
     mark_r = pmm(MARK_SIZE_MM) // 2
-    dot_r = pmm(1.5)
 
+    # 글꼴
     try:
-        font = ImageFont.truetype("arial.ttf", pmm(2.2))
-        label_font = ImageFont.truetype("arial.ttf", pmm(4.0))
+        num_font = ImageFont.truetype("arial.ttf", pmm(2.0))
+        label_font = ImageFont.truetype("arialbd.ttf", pmm(4.5))
+        title_font = ImageFont.truetype("arialbd.ttf", pmm(3.0))
     except Exception:
-        font = ImageFont.load_default()
-        label_font = font
+        num_font = ImageFont.load_default()
+        label_font = num_font
+        title_font = num_font
 
-    # 5개 구역 그리기
+    # 용지 테두리
+    draw.rectangle([1, 1, w-2, h-2], outline='#ccc', width=2)
+
+    # 상단 타이틀
+    draw.text((pmm(5), pmm(2)), "Lotto 6/45", fill='#e44', font=title_font)
+
+    # 셀 크기
+    cell_w = pmm(COL_STEP_MM)
+    cell_h = pmm(ROW_STEP_MM)
+    bracket_pad = pmm(0.3)
+
+    # 선택된 번호 세트 (빠른 조회용)
+    selected = {}
+    for sec_idx, numbers in enumerate(game_sets[:5]):
+        for num in numbers:
+            selected[(sec_idx, num)] = True
+
+    # 5개 구역
     for sec_idx in range(5):
         sec_label = chr(65 + sec_idx)
         sx = pmm(SECTION_X_START[sec_idx])
+        sy = pmm(SECTION_Y_START)
 
-        # 구역 배경
-        grid_w = pmm(COL_STEP_MM * 6 + 6)
-        grid_h = pmm(ROW_STEP_MM * 6 + 6)
-        sec_top = pmm(SECTION_Y_START) - pmm(3)
-        draw.rectangle([sx - pmm(3), sec_top, sx + grid_w, sec_top + grid_h],
-                       fill='#16213e', outline='#334')
+        # 구역 외곽선 (빨간)
+        grid_left = sx - pmm(1.5)
+        grid_right = sx + pmm(COL_STEP_MM * 6 + 1.5)
+        grid_top = sy - pmm(1.5)
+        grid_bot = sy + pmm(ROW_STEP_MM * 6 + 1.5)
+        draw.rectangle([grid_left, grid_top, grid_right, grid_bot],
+                       outline='#e88', width=2)
 
-        # 라벨
-        draw.text((sx + grid_w // 2 - pmm(2), sec_top - pmm(5)),
-                  sec_label, fill='#e44', font=label_font)
+        # 구역 라벨 + 1,000원
+        label_x = grid_right - pmm(7)
+        draw.rectangle([grid_right - pmm(8), grid_top - pmm(6),
+                        grid_right, grid_top],
+                       fill='#e44')
+        bbox = draw.textbbox((0, 0), sec_label, font=label_font)
+        tw = bbox[2] - bbox[0]
+        draw.text((grid_right - pmm(4) - tw//2, grid_top - pmm(5.5)),
+                  sec_label, fill='white', font=label_font)
 
-        # 45개 번호 그리드
+        # 45개 번호
         for num in range(1, 46):
             row = (num - 1) // 7
             col = (num - 1) % 7
-            x = pmm(SECTION_X_START[sec_idx] + col * COL_STEP_MM + OFFSET_X_MM)
-            y = pmm(SECTION_Y_START + row * ROW_STEP_MM + OFFSET_Y_MM)
+            cx = pmm(SECTION_X_START[sec_idx] + col * COL_STEP_MM + OFFSET_X_MM)
+            cy = pmm(SECTION_Y_START + row * ROW_STEP_MM + OFFSET_Y_MM)
 
-            draw.ellipse([x-dot_r, y-dot_r, x+dot_r, y+dot_r], outline='#335', width=1)
+            is_selected = (sec_idx, num) in selected
+
+            # 사각 괄호 [ ] 그리기
+            bx1 = cx - cell_w // 2 + bracket_pad
+            by1 = cy - cell_h // 2 + bracket_pad
+            bx2 = cx + cell_w // 2 - bracket_pad
+            by2 = cy + cell_h // 2 - bracket_pad
+
+            if is_selected:
+                # 선택됨: 검은 채움 (실제 마킹)
+                draw.rectangle([bx1, by1, bx2, by2], fill='#222')
+                text_color = 'white'
+            else:
+                # 미선택: 연회색 괄호
+                draw.rectangle([bx1, by1, bx2, by2], outline='#bbb', width=1)
+                text_color = '#888'
+
+            # 번호 텍스트
             text = str(num)
-            bbox = draw.textbbox((0, 0), text, font=font)
+            bbox = draw.textbbox((0, 0), text, font=num_font)
             tw = bbox[2] - bbox[0]
             th = bbox[3] - bbox[1]
-            draw.text((x - tw//2, y - th//2), text, fill='#445', font=font)
+            draw.text((cx - tw//2, cy - th//2), text, fill=text_color, font=num_font)
 
-    # 선택된 번호 마킹
-    for sec_idx, numbers in enumerate(game_sets[:5]):
-        for num in numbers:
-            if not (1 <= num <= 45):
-                continue
-            row = (num - 1) // 7
-            col = (num - 1) % 7
-            x = pmm(SECTION_X_START[sec_idx] + col * COL_STEP_MM + OFFSET_X_MM)
-            y = pmm(SECTION_Y_START + row * ROW_STEP_MM + OFFSET_Y_MM)
-
-            if num <= 10: color = '#FBC400'
-            elif num <= 20: color = '#69C8F2'
-            elif num <= 30: color = '#FF7272'
-            elif num <= 40: color = '#AAAAAA'
-            else: color = '#B0D840'
-
-            draw.ellipse([x-mark_r, y-mark_r, x+mark_r, y+mark_r], fill=color)
-            text = str(num)
-            bbox = draw.textbbox((0, 0), text, font=font)
-            tw = bbox[2] - bbox[0]
-            th = bbox[3] - bbox[1]
-            draw.text((x - tw//2, y - th//2), text, fill='white', font=font)
+    # 하단 안내문
+    draw.text((pmm(20), pmm(PAPER_H_MM - 6)),
+              "- 발행기관: 복권위원회                         - 한 복권당 가격은 1,000원입니다.",
+              fill='#999', font=num_font)
 
     return img
 
