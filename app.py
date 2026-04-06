@@ -143,8 +143,9 @@ def render_balls(numbers: list[int]) -> str:
     return balls
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def load_data():
+    """데이터 로드 (5분 캐시)"""
     storage = LottoStorage()
     collector = LottoDataCollector()
     if storage.exists():
@@ -160,11 +161,33 @@ def load_data():
     return df
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def run_analysis(_df):
     scorer = WeightedScorer(_df)
     report = scorer.generate_analysis_report()
     return report
+
+
+def auto_check_results(df):
+    """앱 로드 시 자동으로 예측 결과 비교 (새 추첨 결과가 있으면)"""
+    if 'last_checked_round' not in st.session_state:
+        st.session_state['last_checked_round'] = 0
+
+    current_max = int(df['round'].max())
+    if current_max > st.session_state['last_checked_round']:
+        updated_log = update_all_from_df(df)
+        st.session_state['last_checked_round'] = current_max
+
+        # 새로 확인된 결과가 있는지 체크
+        newly_confirmed = []
+        for entry in updated_log:
+            if entry.get('actual') and entry.get('results'):
+                if entry['target_round'] == current_max:
+                    best = max(r['matched_count'] for r in entry['results'])
+                    newly_confirmed.append((entry['target_round'], best))
+
+        if newly_confirmed:
+            st.session_state['new_results'] = newly_confirmed
 
 
 def run_prediction(df, num_sets, temperature):
@@ -181,11 +204,23 @@ if df is None or df.empty:
     st.error("데이터를 불러올 수 없습니다. 인터넷 연결을 확인해 주세요.")
     st.stop()
 
+# ─── 추첨 결과 자동 비교 ───
+auto_check_results(df)
+
 with st.spinner("📊 분석 중..."):
     report = run_analysis(df)
 
 last_round = report['last_round']
 total_rounds = report['total_rounds']
+
+# ─── 새 결과 알림 배너 ───
+new_results = st.session_state.pop('new_results', None)
+if new_results:
+    for rnd, best in new_results:
+        if best >= 3:
+            st.success(f"🎉 제{rnd}회 추첨 결과 확인! 최고 **{best}개 적중**! 예측 이력에서 확인하세요.")
+        else:
+            st.info(f"📋 제{rnd}회 추첨 결과가 반영되었습니다. (최고 {best}개 적중)")
 
 # ─── 사이드바 ───
 with st.sidebar:
@@ -334,7 +369,15 @@ if page == "🎱 예측하기":
 elif page == "📜 예측 이력":
     st.markdown('<p class="main-title">📜 예측 이력</p>', unsafe_allow_html=True)
 
+    # 최신 데이터로 예측 결과 비교 (캐시 무시하고 항상 실행)
     prediction_log = update_all_from_df(df)
+
+    # 확인된/대기 중 카운트
+    confirmed = [e for e in prediction_log if e.get('actual')]
+    pending = [e for e in prediction_log if not e.get('actual')]
+    if confirmed:
+        st.markdown(f'<p class="sub-title">확인: {len(confirmed)}건 | 대기: {len(pending)}건</p>',
+                    unsafe_allow_html=True)
 
     if not prediction_log:
         st.info("아직 저장된 예측이 없습니다. **🎱 예측하기**에서 예측을 생성하면 자동으로 저장됩니다.")
