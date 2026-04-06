@@ -453,7 +453,15 @@ elif page == "📜 예측 이력":
                 real_idx = i * 2 + col_offset
                 card_html, eid = render_card(entry, real_idx)
                 st.markdown(card_html, unsafe_allow_html=True)
-                bc1, bc2, bc3 = st.columns([1, 1, 1])
+                has_result = entry.get('actual') is not None
+                if has_result:
+                    bc0, bc1, bc2, bc3 = st.columns([1, 1, 1, 1])
+                    with bc0:
+                        if st.button("📊 분석", key=f"review_{eid}", use_container_width=True):
+                            st.session_state['review_entry'] = entry
+                else:
+                    bc1, bc2, bc3 = st.columns([1, 1, 1])
+
                 with bc1:
                     if st.button("🖨️ 인쇄", key=f"print_{eid}", use_container_width=True):
                         st.session_state['print_entry'] = entry
@@ -565,6 +573,172 @@ elif page == "📜 예측 이력":
                     </div>""", unsafe_allow_html=True)
                 lp.OFFSET_X_MM = off_x
                 lp.OFFSET_Y_MM = off_y
+
+        # ── 분석 리뷰 영역 ──
+        review_entry = st.session_state.get('review_entry')
+        if review_entry and review_entry.get('actual'):
+            st.divider()
+            target = review_entry['target_round']
+            actual = review_entry['actual']
+            actual_set = set(actual)
+            sets_data = review_entry['sets']
+            results = review_entry['results']
+
+            hdr1, hdr2 = st.columns([4, 1])
+            with hdr1:
+                st.markdown(f"### 📊 제{target}회 예측 분석 리뷰")
+            with hdr2:
+                if st.button("✕ 닫기", key="close_review", use_container_width=True):
+                    del st.session_state['review_entry']
+                    st.rerun()
+
+            # ── 1. 당첨번호 vs 예측 비교표 ──
+            st.markdown("#### 🎯 당첨번호 vs 예측번호 비교")
+            st.markdown(f"**당첨번호:** {render_balls(actual)}", unsafe_allow_html=True)
+            st.write("")
+
+            for j, s in enumerate(sets_data):
+                nums = s['numbers']
+                matched = set(nums) & actual_set
+                missed = set(nums) - actual_set
+                not_picked = actual_set - set(nums)
+
+                # 적중 번호는 초록 테두리, 미적중은 회색
+                balls_html = ""
+                for n in nums:
+                    cls = get_ball_class(n)
+                    if n in matched:
+                        balls_html += f'<span class="ball {cls}" style="box-shadow:0 0 0 3px #4caf50;">{n}</span>'
+                    else:
+                        balls_html += f'<span class="ball" style="background:#333; color:#666;">{n}</span>'
+
+                mc = len(matched)
+                mc_color = "#4caf50" if mc >= 3 else ("#FBC400" if mc >= 2 else ("#69C8F2" if mc >= 1 else "#555"))
+
+                st.markdown(f"""<div style="background:#161622; border-radius:8px; padding:8px 12px; margin:4px 0;">
+                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="color:#555; width:16px;">{j+1}</span>{balls_html}
+                        </div>
+                        <div>
+                            <span style="color:{mc_color}; font-weight:700; font-size:1.1rem;">{mc}개 적중</span>
+                            <span style="color:#555; font-size:0.7rem; margin-left:8px;">
+                                적중: {', '.join(str(n) for n in sorted(matched)) if matched else '-'}
+                                | 미선택: {', '.join(str(n) for n in sorted(not_picked)) if not_picked else '-'}
+                            </span>
+                        </div>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+
+            st.write("")
+
+            # ── 2. 적합도 vs 적중 상관관계 ──
+            st.markdown("#### 📈 적합도 점수 vs 실제 적중")
+            fit_match_data = []
+            for j, s in enumerate(sets_data):
+                mc = results[j]['matched_count'] if results and j < len(results) else 0
+                fit_match_data.append({"세트": f"{j+1}세트", "적합도": s['fitness'], "적중수": mc})
+
+            import pandas as pd
+            fit_df = pd.DataFrame(fit_match_data)
+            c1, c2 = st.columns(2)
+            with c1:
+                st.dataframe(fit_df, hide_index=True, use_container_width=True)
+            with c2:
+                best_fit = fit_df.loc[fit_df['적합도'].idxmax()]
+                best_match = fit_df.loc[fit_df['적중수'].idxmax()]
+                corr = fit_df['적합도'].corr(fit_df['적중수'])
+
+                if best_fit['세트'] == best_match['세트']:
+                    st.success(f"✅ 적합도 최고({best_fit['세트']})가 적중도 최고! 점수 시스템 유효")
+                else:
+                    st.warning(f"⚠️ 적합도 최고: {best_fit['세트']} / 적중 최고: {best_match['세트']}")
+
+                if not pd.isna(corr):
+                    if corr > 0.3:
+                        st.markdown(f"상관계수: **{corr:.2f}** (양의 상관 👍)")
+                    elif corr < -0.3:
+                        st.markdown(f"상관계수: **{corr:.2f}** (역상관 ⚠️)")
+                    else:
+                        st.markdown(f"상관계수: **{corr:.2f}** (약한 상관)")
+
+            st.write("")
+
+            # ── 3. 번호별 분석: 예측이 맞았던 전략 ──
+            st.markdown("#### 🔍 번호별 전략 분석")
+
+            scorer = WeightedScorer(df)
+            freq_data = scorer.freq_analyzer.recent_frequency(10)
+            gap_data = scorer.gap_analyzer.current_gap()
+            avg_gap = scorer.gap_analyzer.average_gap()
+
+            analysis_rows = []
+            for n in sorted(actual):
+                # 이 번호가 몇 세트에서 선택되었는지
+                picked_count = sum(1 for s in sets_data if n in s['numbers'])
+                total_sets = len(sets_data)
+
+                # HOT/COLD/OVERDUE 판별
+                freq = freq_data.get(n, 0)
+                cur_gap = gap_data.get(n, 0)
+                avg_g = avg_gap.get(n, 5)
+                overdue_ratio = cur_gap / avg_g if avg_g > 0 else 0
+
+                if freq >= 3:
+                    strategy = "🔥 HOT"
+                elif overdue_ratio >= 1.5:
+                    strategy = "⏰ OVERDUE"
+                elif freq <= 1:
+                    strategy = "❄️ COLD"
+                else:
+                    strategy = "➖ 보통"
+
+                analysis_rows.append({
+                    "당첨번호": n,
+                    "전략": strategy,
+                    "최근10회 출현": freq,
+                    "현재 미출현": cur_gap,
+                    f"예측 선택": f"{picked_count}/{total_sets}세트",
+                    "판정": "✅ 적중" if picked_count > 0 else "❌ 미선택",
+                })
+
+            analysis_df = pd.DataFrame(analysis_rows)
+            st.dataframe(analysis_df, hide_index=True, use_container_width=True)
+
+            # ── 4. 종합 인사이트 ──
+            st.markdown("#### 💡 종합 인사이트")
+
+            picked_total = sum(1 for r in analysis_rows if "✅" in r["판정"])
+            total_actual = len(actual)
+            hot_hits = sum(1 for r in analysis_rows if "HOT" in r["전략"] and "✅" in r["판정"])
+            cold_hits = sum(1 for r in analysis_rows if "COLD" in r["전략"] and "✅" in r["판정"])
+            overdue_hits = sum(1 for r in analysis_rows if "OVERDUE" in r["전략"] and "✅" in r["판정"])
+            hot_total = sum(1 for r in analysis_rows if "HOT" in r["전략"])
+            cold_total = sum(1 for r in analysis_rows if "COLD" in r["전략"])
+            overdue_total = sum(1 for r in analysis_rows if "OVERDUE" in r["전략"])
+
+            best_mc = max(r['matched_count'] for r in results)
+
+            insights = []
+            insights.append(f"- 당첨 6개 중 **{picked_total}개**를 예측에 포함 ({picked_total}/{total_actual})")
+            insights.append(f"- 최고 적중 세트: **{best_mc}개** 일치")
+
+            if hot_total > 0:
+                insights.append(f"- 🔥 HOT 번호: {hot_total}개 당첨, {hot_hits}개 예측 적중")
+            if cold_total > 0:
+                insights.append(f"- ❄️ COLD 번호: {cold_total}개 당첨, {cold_hits}개 예측 적중")
+            if overdue_total > 0:
+                insights.append(f"- ⏰ OVERDUE 번호: {overdue_total}개 당첨, {overdue_hits}개 예측 적중")
+
+            # 미선택 번호 분석
+            all_predicted = set()
+            for s in sets_data:
+                all_predicted.update(s['numbers'])
+            completely_missed = actual_set - all_predicted
+            if completely_missed:
+                insights.append(f"- ❌ 전혀 예측 못한 번호: **{', '.join(str(n) for n in sorted(completely_missed))}**")
+
+            st.markdown('\n'.join(insights))
 
 
 # ═══════════════════════════════════════════════════════
